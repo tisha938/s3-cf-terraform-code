@@ -1,52 +1,25 @@
-
+# Define the S3 bucket
 resource "aws_s3_bucket" "this" {
-  bucket = local.s3.bucket_name 
-  
- 
+  bucket = local.s3.bucket_name
 }
+
+# Enforce object ownership to bucket owner
 resource "aws_s3_bucket_ownership_controls" "this" {
   bucket = aws_s3_bucket.this.id
   rule {
     object_ownership = "BucketOwnerEnforced"
   }
 }
+
+# Block public access to the S3 bucket
 resource "aws_s3_bucket_public_access_block" "this" {
   bucket = aws_s3_bucket.this.id
 
-  block_public_acls       = false
-  block_public_policy     = false
-  ignore_public_acls      = false
-  restrict_public_buckets = false
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
-
-
-
-module "template_files" {
-  source = "hashicorp/dir/template"
-
-  base_dir = "${path.module}/frontend/html"
-}
-resource "aws_s3_bucket_website_configuration" "this" {
-  bucket = aws_s3_bucket.this.id
-
-  index_document {
-    suffix = "index.html"
-  }
-}
-resource "aws_s3_object" "Bucket_files" {
-  bucket = aws_s3_bucket.this.id
-
-  for_each     = module.template_files.files
-  key          = each.key
-  content_type = each.value.content_type
-
-  source  = each.value.source_path
-  content = each.value.content
-
-  etag = each.value.digests.md5
-}
-
-
 
 resource "aws_s3_bucket_policy" "this" {
   bucket = aws_s3_bucket.this.id
@@ -55,20 +28,13 @@ resource "aws_s3_bucket_policy" "this" {
     "Version" = "2012-10-17",
     "Statement" = [
       {
-        "Sid"       = "PublicReadGetObject",
-        "Effect"    = "Allow",
-        "Principal" = "*",
-        "Action"    = "s3:GetObject",
-        "Resource"  = "${aws_s3_bucket.this.arn}/*"
-      },
-      {
         "Sid"       = "CloudFrontGetObject",
         "Effect"    = "Allow",
         "Principal" = {
-          "Service" = "cloudfront.amazonaws.com"  
+          "AWS" = "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${aws_cloudfront_origin_access_identity.cloudfront_origin_access_identity.id}"
         },
         "Action"    = "s3:GetObject",
-        "Resource"  = "${aws_s3_bucket.this.arn}/*"  
+        "Resource"  = "${aws_s3_bucket.this.arn}/*"
       }
     ]
   })
